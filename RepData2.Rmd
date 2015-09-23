@@ -1,0 +1,39 @@
+---
+title: "RepData2"
+author: "Victor Bucha"
+date: "23 September 2015"
+output: html_document
+keep_md: true
+---
+#Synopsis
+http://www.rpubs.com/rdpeng/13396
+https://rstudio-pubs-static.s3.amazonaws.com/23679_859112a518404d4ba0ecbe89a7da8ef0.html
+https://rstudio-pubs-static.s3.amazonaws.com/49350_fe68dff27e474b0292de36c33952f729.html
+https://rpubs.com/egrjogonzalez/35369
+https://rstudio-pubs-static.s3.amazonaws.com/50334_18a6b7f7dd6949b1ade7b9f0dd4192ce.html
+
+DOC about variables
+https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf
+
+#Data Processing
+###Reading the data
+
+``` {R loadingdata,cache=TRUE}
+# read csv from connection
+system.time(df.raw<-fread("repdata-data-StormData.csv",sep=",",header=TRUE,verbose = TRUE,na.strings ="",stringsAsFactors=TRUE))
+#df.raw<-read.csv("repdata-data-StormData.csv.bz2",sep=",",header=TRUE,na.strings ="")
+```
+
+``` {R loadingdata,cache=TRUE}
+library(dplyr)
+relevant.columns<-df.raw %>% select(EVTYPE,FATALITIES:CROPDMGEXP) %>% 
+        filter(FATALITIES>0|INJURIES>0|PROPDMG>0|CROPDMG>0)
+rm(df.raw)
+
+res<-relevant.columns %>% group_by(EVTYPE) %>% summarise(INJURIES=sum(INJURIES),FATALITIES=sum(FATALITIES)) %>%
+        arrange(-INJURIES)
+
+```
+
+
+#Results
