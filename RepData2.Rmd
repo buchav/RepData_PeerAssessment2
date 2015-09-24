@@ -8,7 +8,7 @@ keep_md: true
 #Synopsis
 
 #Data Processing
-###Reading the data
+##Reading the data
 Let us load needed packages. Data.table package is used for fast .csv file loading.
 ``` {R load packages}
 library(data.table)
@@ -22,15 +22,24 @@ library(tidyr)
 df.raw<-fread("repdata-data-StormData.csv",
         sep=",",header=TRUE,verbose = FALSE,na.strings ="",stringsAsFactors=TRUE)
 ```
-
-Data relevant to the assignment is stored in a few columns- EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP. In addition, we have interest in values greather than 0. Let us select only needed colunms and filter out non-zero values in order to save system resources for further processing.
+### Select relevant columns
+Data relevant to the assignment is stored in a few columns:  
+- EVTYPE  
+- FATALITIES  
+- INJURIES  
+- PROPDMG  
+- PROPDMGEXP  
+- CROPDMG  
+- CROPDMGEXP   
+In addition, we have interest in values greather than 0. Let us select only needed colunms and filter out non-zero values in order to save system resources for further processing.
 ``` {R basic cleaning}
 relevant.columns<-df.raw %>% select(EVTYPE,FATALITIES:CROPDMGEXP) %>% 
         filter(FATALITIES>0|INJURIES>0|PROPDMG>0|CROPDMG>0)
 
 ```
 
-The event type is stored in EVTYPES column. There are many duplicated types of events. Let us combine duplicated types together and store result in new colunm BTYPE.
+### Combine duplicated events
+The event type is stored in EVTYPES column. There are many duplicated types of events. Let us combine duplicated types together and store result in a new column BTYPE.
 ``` {R merge duplicated EVTYPES}
 f<-(relevant.columns$EVTYPE)
 f[grepl("wind",f,ignore.case = TRUE)]="WIND"
@@ -47,7 +56,8 @@ f[grepl("hail",f,ignore.case = TRUE)]="HAIL"
 relevant.columns$BTYPE<-f
 ```
 
-Economical damage includes property and crop damage. We will estimate total economic damage as a sum of property and crop damage. The damage value is represented in two parts - mantissa and exponenta. Mantissa is stored in PROPDMG and CROPDMG fields. Exponenta is stored in PROPDMGEXP and CROPDMGEXP. Exponenta is coded with character "K"=1e3,"M"=1e6,"B"=1e9. Other codes of exponent were not defined clearly in a reference document so we ignore that records. Let us convert damage to proper numeric value.
+### Convert damage to floating point estimate
+Economical damage includes property and crop damages. We will estimate total economic damage as a sum of property and crop damage. The damage value is represented in two parts - mantissa and exponenta. Mantissa is stored in PROPDMG and CROPDMG fields. Exponenta is stored in PROPDMGEXP and CROPDMGEXP. Exponenta is coded with character "K"=1e3,"M"=1e6,"B"=1e9. Other codes of exponent were not defined in a reference document clearly, so we ignore that records. Let us convert damage to proper numeric value and store it in PROPERTY.DMG and CROP.DMG columns.
 
 ``` {R convert damage to numeric}
 #define lookup table for exponent
@@ -65,7 +75,7 @@ damage_converted<-relevant.columns %>%
                                lookup[toupper(CROPDMGEXP)]*CROPDMG,0)) %>%
         select (-c(PROPDMGEXP,PROPDMG,CROPDMGEXP,CROPDMG))
 ```
-
+### Estimate health and economic damages for each event
 ``` {R Summarization of health and economic damages}
 damage<-damage_converted %>% group_by(BTYPE) %>% 
         summarise(INJURIES=sum(INJURIES),FATALITIES=sum(FATALITIES),
