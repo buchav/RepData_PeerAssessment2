@@ -32,7 +32,7 @@ df.raw<-fread("repdata-data-StormData.csv",
 ```
 
 Data relevant to the assignment is stored in a few columns- EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP. In addition, we have interest in values greather than 0. Let us select only needed colunms and filter out non-zero values in order to save system resources for further processing.
-``` {R basic cleaning,cache=TRUE}
+``` {R basic cleaning}
 relevant.columns<-df.raw %>% select(EVTYPE,FATALITIES:CROPDMGEXP) %>% 
         filter(FATALITIES>0|INJURIES>0|PROPDMG>0|CROPDMG>0)
 
@@ -55,35 +55,59 @@ f[grepl("hail",f,ignore.case = TRUE)]="HAIL"
 relevant.columns$BTYPE<-f
 ```
 
-Economical damage includes property and crop damage. We will estimate total economic damage as a sum of property and crop damage. The damage value is represented in two parts - mantissa and exponenta. Mantissa is stored in PROPDMG and CROPDMG fields. Exponenta is stored in PROPDMGEXP and CROPDMGEXP. Exponenta is coded with character "K"=1e3,"M"=1e6,"B"=1e9. Other code of exponent were not defined in reference document so we ignore that records. Let us convert damage to proper numeric value.
+Economical damage includes property and crop damage. We will estimate total economic damage as a sum of property and crop damage. The damage value is represented in two parts - mantissa and exponenta. Mantissa is stored in PROPDMG and CROPDMG fields. Exponenta is stored in PROPDMGEXP and CROPDMGEXP. Exponenta is coded with character "K"=1e3,"M"=1e6,"B"=1e9. Other codes of exponent were not defined clearly in a reference document so we ignore that records. Let us convert damage to proper numeric value.
 
 ``` {R convert damage to numeric,cache=TRUE}
 #define lookup table for exponent
 lookup<-c(K=1000,M=1e6,B=1e9)
 relevant.columns<-relevant.columns %>% 
-        mutate(NPROPDMG=ifelse(toupper(PROPDMGEXP) %in% names(lookup),
+        mutate(PROPERTY.DMG=ifelse(toupper(PROPDMGEXP) %in% names(lookup),
                                        lookup[toupper(PROPDMGEXP)]*PROPDMG,0),
-               NCROPDMG=ifelse(toupper(CROPDMGEXP) %in% names(lookup),
-                               lookup[toupper(CROPDMGEXP)]*CROPDMG,0),
-               TOTALDMG=NPROPDMG+NCROPDMG) %>%
+               CROP.DMG=ifelse(toupper(CROPDMGEXP) %in% names(lookup),
+                               lookup[toupper(CROPDMGEXP)]*CROPDMG,0)) %>%
         select (-c(PROPDMGEXP,PROPDMG,CROPDMGEXP,CROPDMG))
 
 ```
 
-``` {R answer Q1 EVTYPES}
-harm_health<-relevant.columns %>% group_by(BTYPE) %>% 
+``` {R Summarization of health and economic damages}
+damage<-relevant.columns %>% group_by(BTYPE) %>% 
         summarise(INJURIES=sum(INJURIES),FATALITIES=sum(FATALITIES),
-                  DMGPROP=sum(NPROPDMG)/10e6,CROPDMG=sum(NCROPDMG)/10e6,
-                  TOTALDMG=sum(TOTALDMG)/10e6) %>%
-        mutate(TOTAL_HEALTH=INJURIES+FATALITIES) %>% arrange(-TOTAL_HEALTH)
+                  PROPERTY=sum(PROPERTY.DMG)/10e6,CROP=sum(CROP.DMG)/10e6) %>%
+        mutate(TOTAL_HEALTH=INJURIES+FATALITIES,
+               TOTAL_ECONOMIC=(PROPERTY+CROP))
 
-top10.harm_health<-harm_health[1:10] %>% gather(DAMAGE.TYPE,COUNT,-c(BTYPE,TOTAL_HEALTH,CROPDMG,DMGPROP))
+```
+
+#Results
+
+``` {R answer Q1 question}
+damage<-damage %>% arrange(-TOTAL_HEALTH)
+top10.harm_health<-damage[1:10] %>%
+        select(BTYPE,INJURIES,FATALITIES,TOTAL_HEALTH) %>%
+        gather(DAMAGE.TYPE,COUNT,-c(BTYPE,TOTAL_HEALTH))
+
+#sort factor in descending order ot total health damage
 top10.harm_health$BTYPE<-with (top10.harm_health,reorder(BTYPE,-TOTAL_HEALTH))
+
 ggplot(top10.harm_health,aes(x=BTYPE,y=COUNT,fill=DAMAGE.TYPE))+
         geom_bar(stat = "identity")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
-        labs(title="Population health damage in US",x="Event",y="Count")
+        labs(title="Total population health damage in US. 1950-2011 ",x="Event",y="Count")
 ```
 
 
-#Results
+``` {R answer Q2 question}
+damage<-damage %>% arrange(-TOTAL_ECONOMIC)
+
+top10.harm_econ<-damage[1:10] %>%
+        select(BTYPE,PROPERTY,CROP,TOTAL_ECONOMIC) %>%
+        gather(DAMAGE.TYPE,COUNT,-c(BTYPE,TOTAL_ECONOMIC))
+
+#sort factor in descending order ot total health damage
+top10.harm_econ$BTYPE<-with (top10.harm_econ,reorder(BTYPE,-TOTAL_ECONOMIC))
+
+ggplot(top10.harm_econ,aes(x=BTYPE,y=COUNT,fill=DAMAGE.TYPE))+
+        geom_bar(stat = "identity")+
+        theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+        labs(title="Total economic damage in US. 1950-2011",x="Event",y="US Dollars (in millions)")
+```
