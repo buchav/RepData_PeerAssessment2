@@ -57,20 +57,24 @@ relevant.columns$BTYPE<-f
 
 Economical damage includes property and crop damage. We will estimate total economic damage as a sum of property and crop damage. The damage value is represented in two parts - mantissa and exponenta. Mantissa is stored in PROPDMG and CROPDMG fields. Exponenta is stored in PROPDMGEXP and CROPDMGEXP. Exponenta is coded with character "K"=1e3,"M"=1e6,"B"=1e9. Other codes of exponent were not defined clearly in a reference document so we ignore that records. Let us convert damage to proper numeric value.
 
-``` {R convert damage to numeric,cache=TRUE}
+``` {R convert damage to numeric}
 #define lookup table for exponent
 lookup<-c(K=1000,M=1e6,B=1e9)
-relevant.columns<-relevant.columns %>% 
+relevant.columns$PROPDMGEXP<-as.character(relevant.columns$PROPDMGEXP)
+relevant.columns$CROPDMGEXP<-as.character(relevant.columns$CROPDMGEXP)
+relevant.columns$CROPDMGEXP[is.na(relevant.columns$CROPDMGEXP)]="NA"
+relevant.columns$PROPDMGEXP[is.na(relevant.columns$PROPDMGEXP)]="NA"
+
+damage_converted<-relevant.columns %>% 
         mutate(PROPERTY.DMG=ifelse(toupper(PROPDMGEXP) %in% names(lookup),
                                        lookup[toupper(PROPDMGEXP)]*PROPDMG,0),
                CROP.DMG=ifelse(toupper(CROPDMGEXP) %in% names(lookup),
                                lookup[toupper(CROPDMGEXP)]*CROPDMG,0)) %>%
         select (-c(PROPDMGEXP,PROPDMG,CROPDMGEXP,CROPDMG))
-
 ```
 
 ``` {R Summarization of health and economic damages}
-damage<-relevant.columns %>% group_by(BTYPE) %>% 
+damage<-damage_converted %>% group_by(BTYPE) %>% 
         summarise(INJURIES=sum(INJURIES),FATALITIES=sum(FATALITIES),
                   PROPERTY=sum(PROPERTY.DMG)/10e6,CROP=sum(CROP.DMG)/10e6) %>%
         mutate(TOTAL_HEALTH=INJURIES+FATALITIES,
