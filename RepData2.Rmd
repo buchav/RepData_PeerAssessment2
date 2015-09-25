@@ -1,13 +1,14 @@
 ---
-title: "RepData2"
+title: "Health and Economic damage of weather events between 1950-2011"
 author: "Victor Bucha"
 date: "23 September 2015"
 output: html_document
 keep_md: true
 ---
 #Synopsis
+In this report we studied health and economic damages of weather events between 1950-2011 in US. We found that Tornado event made the most damge to the population health (injuries and fatalities).Floods and hurricanes made the most damge in economic domain (property and crop). 
 
-#Data Processing
+#Data Processing 
 ##Reading the data
 Let us load needed packages. Data.table package is used for fast .csv file loading.
 ``` {R load packages}
@@ -15,9 +16,25 @@ library(data.table)
 library(dplyr,warn.conflicts=FALSE)
 library(ggplot2)
 library(tidyr)
+library(R.utils)
 ```
 
-``` {R loadingdata,cache=TRUE}
+At first, let us check raw data file in a working directory. If it does not exsist download and unpack it.
+``` {R check raw data file}
+URLdata="https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+rawfilenamebz2="repdata-data-StormData.csv.bz2"
+rawfilename="repdata-data-StormData.csv"
+
+# if raw data is not present in working folder, download and unpack it
+if (!file.exists(rawfilename)){
+        if (!file.exists(rawfilenamebz2))
+                download.file(URLdata,rawfilenamebz2)
+        else
+                bunzip2(rawfilenamebz2, destname = rawfilename, remove = FALSE)
+}
+```
+
+``` {R loadingdata,cache=TRUE}        
 # read csv from connection
 df.raw<-fread("repdata-data-StormData.csv",
         sep=",",header=TRUE,verbose = FALSE,na.strings ="",stringsAsFactors=TRUE)
@@ -75,7 +92,7 @@ damage_converted<-relevant.columns %>%
                                lookup[toupper(CROPDMGEXP)]*CROPDMG,0)) %>%
         select (-c(PROPDMGEXP,PROPDMG,CROPDMGEXP,CROPDMG))
 ```
-### Estimate health and economic damages for each event
+### Estimate health and economic damages for each event type
 ``` {R Summarization of health and economic damages}
 damage<-damage_converted %>% group_by(BTYPE) %>% 
         summarise(INJURIES=sum(INJURIES),FATALITIES=sum(FATALITIES),
@@ -86,7 +103,7 @@ damage<-damage_converted %>% group_by(BTYPE) %>%
 ```
 
 #Results
-
+##Question 1. Most harmful event type with respect to population health
 ``` {R answer Q1 question}
 damage<-damage %>% arrange(-TOTAL_HEALTH)
 top10.harm_health<-damage[1:10] %>%
@@ -96,13 +113,14 @@ top10.harm_health<-damage[1:10] %>%
 #sort factor in descending order ot total health damage
 top10.harm_health$BTYPE<-with (top10.harm_health,reorder(BTYPE,-TOTAL_HEALTH))
 
+#draw plot
 ggplot(top10.harm_health,aes(x=BTYPE,y=COUNT,fill=DAMAGE.TYPE))+
         geom_bar(stat = "identity")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
         labs(title="Total population health damage in US. 1950-2011 ",x="Event",y="Count")
 ```
 
-
+##Question 1. Most harmful event type with respect to economic consequences
 ``` {R answer Q2 question}
 damage<-damage %>% arrange(-TOTAL_ECONOMIC)
 
@@ -113,6 +131,7 @@ top10.harm_econ<-damage[1:10] %>%
 #sort factor in descending order ot total health damage
 top10.harm_econ$BTYPE<-with (top10.harm_econ,reorder(BTYPE,-TOTAL_ECONOMIC))
 
+#draw plot
 ggplot(top10.harm_econ,aes(x=BTYPE,y=COUNT,fill=DAMAGE.TYPE))+
         geom_bar(stat = "identity")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
